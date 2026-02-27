@@ -3,6 +3,13 @@ from discord.ext import commands
 from discord import app_commands, ui, ButtonStyle
 import os
 
+# Pobierz token ze środowiska (Fly.io Secrets)
+DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+
+if not DISCORD_TOKEN:
+    print('❌ Brak tokenu DISCORD_TOKEN. Ustaw go w Fly.io Secrets!')
+    exit(1)
+
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
@@ -30,7 +37,7 @@ CENY = {
 
 class GlownyView(ui.View):
     def __init__(self):
-        super().__init__(timeout=None)  # Bez timeout - przyciski działają zawsze
+        super().__init__(timeout=None)
         self.koszyk = {}
     
     @ui.button(label="☕ Kupno pojedyńcze", style=ButtonStyle.primary, emoji="☕", custom_id="kupno_pojedyńcze")
@@ -79,7 +86,6 @@ class ProduktyView(ui.View):
         self.kategoria = kategoria
         self.parent = parent_view
         
-        # Tworzymy przyciski dla każdego produktu w kategorii
         for produkt in CENY[kategoria].keys():
             self.add_item(ProduktButton(produkt, kategoria, parent_view))
 
@@ -114,9 +120,8 @@ class IloscView(ui.View):
             self.ilosc -= 1
             await self.update_message(interaction)
     
-    @ui.button(style=ButtonStyle.gray)
+    @ui.button(label="Ilość: 1", style=ButtonStyle.gray)
     async def display_count(self, interaction: discord.Interaction, button: ui.Button):
-        # Przycisk tylko informacyjny
         await interaction.response.defer()
     
     @ui.button(label="➕", style=ButtonStyle.green)
@@ -132,7 +137,7 @@ class IloscView(ui.View):
         embed.add_field(name="Produkt", value=self.produkt, inline=True)
         embed.add_field(name="Ilość", value=self.ilosc, inline=True)
         embed.add_field(name="Cena całkowita", value=f"**{total} $**", inline=False)
-        embed.set_footer(text="📦 × Cena za produkty to " + str(total) + " $")
+        embed.set_footer(text=f"📦 × Cena za {self.ilosc} produkt/ów to {total} $")
         
         view = ui.View()
         view.add_item(ZamknijButton())
@@ -140,9 +145,8 @@ class IloscView(ui.View):
         await interaction.response.edit_message(embed=embed, view=view)
     
     async def update_message(self, interaction: discord.Interaction):
-        # Aktualizujemy przycisk z ilością
         for child in self.children:
-            if child.style == ButtonStyle.gray:
+            if child.label and "Ilość:" in child.label:
                 child.label = f"Ilość: {self.ilosc}"
                 break
         
@@ -199,17 +203,14 @@ async def on_ready():
 async def cennik(interaction: discord.Interaction):
     embed = discord.Embed(title="🏪 Cennik Kawiarni", color=0xFF7600)
     
-    # Napoje
     napoje_desc = ""
     for napoj, cena in CENY["napoje"].items():
         napoje_desc += f"{napoj}\n**{cena} $**\n\n"
     
-    # Jedzenie
     jedzenie_desc = ""
     for jedzenie, cena in CENY["jedzenie"].items():
         jedzenie_desc += f"{jedzenie}\n**{cena} $**\n\n"
     
-    # Zestawy
     zestawy_desc = ""
     for zestaw, cena in CENY["zestawy"].items():
         zestawy_desc += f"{zestaw}\n**{cena} $**\n\n"
@@ -218,12 +219,8 @@ async def cennik(interaction: discord.Interaction):
     embed.add_field(name="🍰 Jedzenie", value=jedzenie_desc, inline=True)
     embed.add_field(name="📦 Zestawy", value=zestawy_desc, inline=True)
     
-    # Dodajemy przyciski pod cennikiem
     view = GlownyView()
     await interaction.response.send_message(embed=embed, view=view)
 
-token = os.getenv('DISCORD_TOKEN')
-if token:
-    bot.run(token)
-else:
-    print('❌ Brak tokenu DISCORD_TOKEN')
+# Uruchomienie bota
+bot.run(DISCORD_TOKEN)
